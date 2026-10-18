@@ -24,6 +24,8 @@ env:
   # (documented in the README: "To bootstrap without 1Password, set OP_INTEGRATION_DISABLED=1"). The 1password/load-secrets-action
   # step only checks that a token is present, so a placeholder satisfies it.
   OP_INTEGRATION_DISABLED: "1"
+  # preloop CI: no Clerk dev instance, so deselect the tests that authenticate against the real Clerk API
+  PYTEST_ADDOPTS: "--deselect tests/routes/api_test.py::test_authorized_clerk_credentials --deselect tests/routes/authentication_test.py::test_authorized_good_credentials --deselect tests/routes/login_as_test.py::test_login_as_authorized_bad_credentials --deselect tests/routes/login_as_test.py::test_login_as_authorized_good_credentials --deselect tests/routes/login_as_test.py::test_login_as_reset_credentials --deselect tests/routes/login_as_test.py::test_login_as_user_route --deselect tests/routes/login_as_test.py::test_non_admin_role --deselect tests/routes/login_as_test.py::test_normal_route_as_admin --deselect tests/routes/login_as_test.py::test_user_list"
   OP_SERVICE_ACCOUNT_TOKEN: "ops_ci_placeholder_integration_disabled"
 
   # for the gh-cli
