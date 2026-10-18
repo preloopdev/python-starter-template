@@ -11,12 +11,16 @@ import logging
 import os
 import re
 from collections.abc import Mapping
-from typing import Literal, overload
+from typing import Literal, TypedDict, overload
 from urllib.parse import quote, urlencode
 
 logger = logging.getLogger("react_router_routes.generated")
 
-RoutePaths = Literal["/", "/home", "/form", "/login"]
+RoutePaths = Literal["/", "/sign-up/*", "/home", "/form", "/login"]
+
+
+class SignUpSplatParams(TypedDict):
+    splat: str
 
 
 ALIAS_MAP: dict[str, dict[str, str]] = {}
@@ -28,6 +32,22 @@ ALIAS_MAP: dict[str, dict[str, str]] = {}
 def react_router_path(
     path: Literal["/"],
     params: None | Mapping[str, object] = None,
+    *,
+    url_params: dict[str, str] | None = None,
+) -> str: ...
+
+
+@overload
+def react_router_path(
+    path: Literal["/sign-up/*"],
+    params: SignUpSplatParams,
+    *,
+    url_params: dict[str, str] | None = None,
+) -> str: ...
+@overload
+def react_router_path(
+    path: Literal["/sign-up/*"],
+    params: Mapping[str, object],
     *,
     url_params: dict[str, str] | None = None,
 ) -> str: ...
@@ -130,6 +150,24 @@ def react_router_path(
 def react_router_url(
     path: Literal["/"],
     params: None | Mapping[str, object] = None,
+    *,
+    base_url: str | None = None,
+    url_params: dict[str, str] | None = None,
+) -> str: ...
+
+
+@overload
+def react_router_url(
+    path: Literal["/sign-up/*"],
+    params: SignUpSplatParams,
+    *,
+    base_url: str | None = None,
+    url_params: dict[str, str] | None = None,
+) -> str: ...
+@overload
+def react_router_url(
+    path: Literal["/sign-up/*"],
+    params: Mapping[str, object],
     *,
     base_url: str | None = None,
     url_params: dict[str, str] | None = None,
