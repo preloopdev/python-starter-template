@@ -69,6 +69,15 @@ jobs:
         with:
           chrome: true
       - run: just docker_up --fast
+      # preloop VMs have no systemd-resolved. On GitHub-hosted runners containers resolve the *.localhost names that
+      # docker-hosts writes to /etc/hosts because Docker forwards their DNS to the host's loopback resolver (127.0.0.53),
+      # which reads /etc/hosts. Recreate that with a tiny loopback resolver.
+      - name: Loopback DNS resolver that reads /etc/hosts
+        run: |
+          sudo apt-get install -y --no-install-recommends dnsmasq-base
+          UP=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf)
+          sudo dnsmasq --listen-address=127.0.0.53 --bind-interfaces --no-resolv --server="$UP" --conf-file=/dev/null --pid-file=/tmp/dnsmasq.pid
+          printf 'nameserver 127.0.0.53\n' | sudo tee /etc/resolv.conf
       - name: Cache Playwright Browsers
         uses: actions/cache@v6
         with:
