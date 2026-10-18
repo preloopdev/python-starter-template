@@ -47,7 +47,11 @@ export async function getClient() {
 
   if (!clerk.loaded) {
     // https://clerk.com/docs/js-frontend/reference/objects/clerk#load
-    await clerk.load()
+    // Path routing: keep the auth flows on our own routes. Without these the
+    // instance's URLs (Clerk's hosted Account Portal) win, so the "Sign up"
+    // link leaves the app mid-flow. Loading options are what count here: the
+    // provider below reuses this already-loaded instance and cannot re-apply them.
+    await clerk.load({ signInUrl: "/", signUpUrl: "/sign-up" })
   }
 
   // protect users from hitting the internal API if they aren't authenticated
