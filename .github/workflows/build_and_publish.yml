@@ -20,8 +20,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # run `just secrets_ci_grant-github-actions` to grant CI access to 1Password
-  OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+  # preloop CI: no 1Password. OP_INTEGRATION_DISABLED makes .envrc load fake secret values instead of resolving op:// references
+  # (documented in the README: "To bootstrap without 1Password, set OP_INTEGRATION_DISABLED=1"). The 1password/load-secrets-action
+  # step only checks that a token is present, so a placeholder satisfies it.
+  OP_INTEGRATION_DISABLED: "1"
+  OP_SERVICE_ACCOUNT_TOKEN: "ops_ci_placeholder_integration_disabled"
 
   # for the gh-cli
   GH_TOKEN: ${{ github.token }}
