@@ -71,6 +71,11 @@ export default function withClerkProvider(Component: React.ComponentType) {
       publishableKey={CLERK_PUBLIC_KEY}
       signInFallbackRedirectUrl="/"
       signUpFallbackRedirectUrl="/"
+      // Keep Clerk's auth flows inside the app. Without these, the instance's
+      // URLs (Clerk's hosted Account Portal) win and the "Sign up" link leaves
+      // the app mid-flow.
+      signInUrl="/"
+      signUpUrl="/sign-up"
     >
       <Component {...props} />
     </ClerkProvider>

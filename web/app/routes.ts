@@ -6,6 +6,8 @@ import { index, layout, route } from "@react-router/dev/routes"
 
 export default [
   index("routes/index.tsx"),
+  // Clerk path routing: the sign-up component lives at /sign-up/*
+  route("/sign-up/*", "routes/signup.tsx"),
   layout("layouts/authenticated.tsx", [
     route("/home", "routes/home.tsx"),
     route("/form", "routes/form.tsx"),
