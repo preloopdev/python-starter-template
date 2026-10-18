@@ -24,9 +24,21 @@ env:
   # (documented in the README: "To bootstrap without 1Password, set OP_INTEGRATION_DISABLED=1"). The 1password/load-secrets-action
   # step only checks that a token is present, so a placeholder satisfies it.
   OP_INTEGRATION_DISABLED: "1"
-  # preloop CI: no Clerk dev instance, so deselect the tests that authenticate against the real Clerk API
-  PYTEST_ADDOPTS: "--deselect tests/routes/api_test.py::test_authorized_clerk_credentials --deselect tests/routes/authentication_test.py::test_authorized_good_credentials --deselect tests/routes/login_as_test.py::test_login_as_authorized_bad_credentials --deselect tests/routes/login_as_test.py::test_login_as_authorized_good_credentials --deselect tests/routes/login_as_test.py::test_login_as_reset_credentials --deselect tests/routes/login_as_test.py::test_login_as_user_route --deselect tests/routes/login_as_test.py::test_non_admin_role --deselect tests/routes/login_as_test.py::test_normal_route_as_admin --deselect tests/routes/login_as_test.py::test_user_list"
   OP_SERVICE_ACCOUNT_TOKEN: "ops_ci_placeholder_integration_disabled"
+
+  # preloop CI: credentials for the real Clerk development instance that the backend tests, the javascript build and
+  # the Playwright integration tests authenticate against. These are repository secrets, never committed.
+  #
+  # `./.github/actions/common-setup` renders them into `env/not_production.local.sh` (gitignored, sourced by `.envrc`
+  # after `env/not_production.sh`) so they override the "fake-op-value" placeholders that `OP_INTEGRATION_DISABLED=1`
+  # produces. There is intentionally no `CLERK_PRIVATE_KEY` here: that variable is only ever written by that step, so
+  # the value the app reads can never race with a placeholder.
+  #
+  # NOTE: these are *inputs* to the render step, not variables the app itself reads. If the secrets are missing the
+  # `Render Clerk credentials` step fails loudly instead of letting Clerk tests fail with a confusing auth error.
+  CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+  CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+  CLERK_FRONTEND_API_URL: ${{ secrets.CLERK_FRONTEND_API_URL }}
 
   # for the gh-cli
   GH_TOKEN: ${{ github.token }}
@@ -71,15 +83,6 @@ jobs:
         with:
           chrome: true
       - run: just docker_up --fast
-      # preloop VMs have no systemd-resolved. On GitHub-hosted runners containers resolve the *.localhost names that
-      # docker-hosts writes to /etc/hosts because Docker forwards their DNS to the host's loopback resolver (127.0.0.53),
-      # which reads /etc/hosts. Recreate that with a tiny loopback resolver.
-      - name: Loopback DNS resolver that reads /etc/hosts
-        run: |
-          sudo apt-get install -y --no-install-recommends dnsmasq-base
-          UP=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf)
-          sudo dnsmasq --listen-address=127.0.0.53 --bind-interfaces --no-resolv --server="$UP" --conf-file=/dev/null --pid-file=/tmp/dnsmasq.pid
-          printf 'nameserver 127.0.0.53\n' | sudo tee /etc/resolv.conf
       - name: Cache Playwright Browsers
         uses: actions/cache@v6
         with:

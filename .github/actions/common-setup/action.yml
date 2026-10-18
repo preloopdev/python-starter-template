@@ -5,6 +5,54 @@ runs:
   using: "composite"
   steps:
     # NOTE cannot run checkout in this local action, must be run by the parent action
+
+    # Render the Clerk credentials (passed in as `CLERK_SECRET_KEY`/`CLERK_PUBLISHABLE_KEY`/`CLERK_FRONTEND_API_URL`
+    # environment variables from repository secrets by the calling workflow) into an env file that `.envrc` sources.
+    #
+    # Two things make this necessary:
+    # - With `OP_INTEGRATION_DISABLED=1` the `op_inject_source` function in `.envrc` replaces every
+    #   1Password reference in `env/not_production.sh` with the literal string "fake-op-value". Clerk rejects keys
+    #   like that ("The provided Clerk Secret Key is invalid", "Frontend API URL or valid publishable key is
+    #   required"), so the placeholders have to be overwritten.
+    # - `env/not_production.local.sh` is sourced by `.envrc` immediately after `env/not_production.sh` and before the
+    #   environment-specific files. It is gitignored (`env/*local.*`), which is why the keys are written here at
+    #   runtime instead of being committed.
+    #
+    # IMPORTANT: this must run *before* the `github-action-direnv-load-and-mask` step below. That step loads the
+    # direnv environment into `$GITHUB_ENV`, which is what every later `run:` step sees (the pytest invocations do
+    # not go through `direnv exec`).
+    - name: Render Clerk credentials into env/not_production.local.sh
+      shell: bash
+      run: |
+        : Synchronize the Clerk env file with the repository secrets
+
+        missing_secrets=()
+        for secret_name in CLERK_SECRET_KEY CLERK_PUBLISHABLE_KEY CLERK_FRONTEND_API_URL; do
+          if [ -z "${!secret_name:-}" ]; then
+            missing_secrets+=("$secret_name")
+          fi
+        done
+
+        if (( ${#missing_secrets[@]} > 0 )); then
+          echo "::error::missing repository secrets on this repo: ${missing_secrets[*]}"
+          exit 1
+        fi
+
+        # CLERK_PRIVATE_KEY/CLERK_PUBLISHABLE_KEY are what the python app reads (app/configuration/clerk.py,
+        # tests/integration/clerk.py), VITE_CLERK_PUBLIC_KEY is baked into the javascript bundle by vite
+        # (web/app/configuration/clerk.tsx) and CLERK_FAPI_URL is used by the playwright clerk testing-token helper.
+        cat > env/not_production.local.sh <<EOF
+        # GENERATED FILE, do not edit and do not commit (see .gitignore::env/*local.*)
+        # Written by .github/actions/common-setup from repository secrets on CI.
+        export CLERK_PRIVATE_KEY="$CLERK_SECRET_KEY"
+        export CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY"
+        export VITE_CLERK_PUBLIC_KEY="$CLERK_PUBLISHABLE_KEY"
+        export CLERK_FAPI_URL="$CLERK_FRONTEND_API_URL"
+        EOF
+
+        # never echo the values, only the variable names
+        echo "rendered env/not_production.local.sh: CLERK_PRIVATE_KEY CLERK_PUBLISHABLE_KEY VITE_CLERK_PUBLIC_KEY CLERK_FAPI_URL"
+
     # mise can rarely get stuck installing. It normally takes < 10s to install, so this should never be more than a minute
     # web/ has it's own mise config, but it's copied from the root mise config, so we don't need to worry about it
     - uses: jdx/mise-action@v4

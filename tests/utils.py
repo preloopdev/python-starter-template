@@ -1,5 +1,4 @@
 import base64
-import os
 
 from tenacity import retry, stop_after_attempt
 
@@ -60,10 +59,6 @@ def delete_all_clerk_users():
     "clerk dev instances can hold a max of ~100 users, in order to avoid hitting that limit, we delete all users except for the dev users"
 
     log.info("deleting all dev clerk users")
-
-    # preloop CI: no real Clerk instance (1Password is disabled, so the key is a placeholder)
-    if os.environ.get("OP_INTEGRATION_DISABLED"):
-        return
 
     if not is_testing():
         raise RuntimeError("cannot delete dev users outside of testing")
