@@ -19,6 +19,7 @@ Usage:
 Attempting to upstream at: https://github.com/clerk/clerk-sdk-python/pull/65/files
 """
 
+import json
 import logging
 import os
 import re
@@ -121,6 +122,20 @@ def parse_publishable_key(
     return PublishableKey(instance_type=instance_type, frontend_api=frontend_api)
 
 
+def clerk_fapi_route_pattern(frontend_api_url: str) -> re.Pattern[str]:
+    """Build the Frontend API URL route pattern used to inject the testing token.
+
+    The Clerk JS helper expects the frontend API URL *without* the protocol
+    (https://github.com/clerk/javascript/blob/main/packages/testing/src/playwright/setupClerkTestingToken.ts),
+    but `CLERK_FAPI_URL` is commonly set to the full origin (e.g. `https://foo-13.clerk.accounts.dev`, see
+    `.github/actions/common-setup`). Normalize both forms, otherwise the pattern never matches and requests go
+    out without the testing token (and bot protection challenges the sign-up).
+    """
+    frontend_api_url = re.sub(r"^https?://", "", frontend_api_url).rstrip("/")
+
+    return re.compile(rf"^https://{re.escape(frontend_api_url)}/v1/.*?(\?.*)?$")
+
+
 def setup_clerk_testing_token(page: Page, frontend_api_url: str | None = None):
     """
     Bypasses bot protection by appending the testing token in the Frontend API requests.
@@ -164,9 +179,11 @@ def setup_clerk_testing_token(page: Page, frontend_api_url: str | None = None):
                 "CLERK_TESTING_TOKEN or CLERK_PRIVATE_KEY is required to generate a test token"
             )
 
-    api_url = re.compile(rf"^https://{re.escape(frontend_api_url)}/v1/.*?(\?.*)?$")
+    api_url = clerk_fapi_route_pattern(frontend_api_url)
 
-    logger.debug(f"Adding clerk testing token to URL url={api_url}")
+    logger.info(
+        f"Intercepting Clerk FAPI requests with {TESTING_TOKEN_PARAM} pattern={api_url.pattern}"
+    )
 
     def handle_route(route, request):
         """
@@ -186,7 +203,13 @@ def setup_clerk_testing_token(page: Page, frontend_api_url: str | None = None):
         logger.debug("rewriting URL old=%s new=%s", url, new_url)
 
         response = route.fetch(url=new_url)
-        payload = response.json()
+
+        # endpoints that answer `204 No Content` have nothing to rewrite, pass them through untouched
+        if not (body := response.body()):
+            route.fulfill(response=response)
+            return
+
+        payload = json.loads(body)
 
         if isinstance(payload, dict):
             response_data = payload.get("response")
@@ -220,4 +243,4 @@ def teardown_clerk_testing_token(
         assert parsed_result
         frontend_api_url = parsed_result.frontend_api
 
-    page.unroute(f"https://{frontend_api_url}/v1/**")
+    page.unroute(clerk_fapi_route_pattern(frontend_api_url))
